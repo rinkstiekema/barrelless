@@ -1,0 +1,7 @@
+# Dependencies
+node_modules/
+
+# IDE and editor files
+.vscode/
+
+todo.md

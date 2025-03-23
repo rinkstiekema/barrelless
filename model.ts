@@ -1,0 +1,57 @@
+import { ImportSpecifier, Parser } from "jscodeshift";
+import { Program, LanguageService } from "typescript";
+
+export type TransformOptions = {
+    parser: string | Parser;
+    projectRoot: string;
+    quoteStyle: "single" | "double";
+};
+
+export type ProgramCache = {
+    // Cache of identified barrel files (path -> boolean)
+    barrelFilesMap: Map<string, boolean>;
+
+    // Stores path aliases from tsconfig.json
+    pathAliases?: Record<string, string>;
+    tsProgram?: Program;
+    tsLanguageService?: LanguageService;
+};
+
+export type SymbolDeclaration = {
+    symbol: string;
+    sourceFilePath: string;
+    importSpecifier: string;
+    importPosition: number;
+};
+
+export type ImportSymbol = {
+    name: string;
+    localName: string;
+    type: string;
+    hasAlias: boolean;
+};
+
+export type BarrelImportInfo = {
+    barrelFile: string;
+    importSource: string;
+    symbols: {
+        name: string;
+        localName: string;
+        declarationFile: string | null;
+    }[];
+};
+
+export type NewImport = {
+    specifiers: ImportSpecifier[];
+    source: string;
+};
+
+export type ImportReplacement = {
+    barrelImportPath: string;
+    newImports: NewImport[];
+};
+
+export type ProcessedImport = {
+    hasBarrelImports: boolean;
+    importReplacements: ImportReplacement[];
+};
