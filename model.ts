@@ -3,8 +3,8 @@ import { Program, LanguageService } from "typescript";
 
 export type TransformOptions = {
     parser: string | Parser;
-    projectRoot: string;
-    quoteStyle: "single" | "double";
+    "project-root": string;
+    "quote-style": "single" | "double";
 };
 
 export type ProgramCache = {

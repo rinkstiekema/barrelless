@@ -30,8 +30,8 @@ const BARREL_FILE_PATTERNS = ["index.ts"];
 
 const DEFAULT_TRANSFORM_OPTIONS: TransformOptions = {
     parser: "tsx",
-    projectRoot: process.cwd(),
-    quoteStyle: "single" as const,
+    "project-root": process.cwd(),
+    "quote-style": "single" as const,
 };
 
 const programCache: ProgramCache = {
@@ -730,7 +730,7 @@ const processFile = ({
             jscodeshift: jscodeshift,
             root,
             fileInfo,
-            projectRoot: options.projectRoot,
+            projectRoot: options["project-root"],
             tsconfig: tsconfig,
         });
 
@@ -761,7 +761,7 @@ const processFile = ({
             });
 
             // Return the transformed source with the configured quote style
-            return root.toSource({ quote: options.quoteStyle });
+            return root.toSource({ quote: options["quote-style"] });
         }
 
         // Return undefined to indicate no changes were made
@@ -789,22 +789,25 @@ const processFile = ({
 module.exports = function transform(
     fileInfo: FileInfo,
     api: API,
-    cliOptions: Partial<TransformOptions>
+    cliOptions: Partial<TransformOptions> & {
+        "project-root": string;
+        "quote-style": "single" | "double";
+    }
 ): string | undefined {
     const options: TransformOptions = {
         ...DEFAULT_TRANSFORM_OPTIONS,
         ...cliOptions,
     };
 
-    const tsconfig = getTSConfig(options.projectRoot);
+    const tsconfig = getTSConfig(options["project-root"]);
     if (!fileIsIncluded(tsconfig, fileInfo.path)) {
         return undefined;
     }
 
-    initTypescriptServices(options.projectRoot, tsconfig);
+    initTypescriptServices(options["project-root"], tsconfig);
 
     const jscodeshift = api.jscodeshift.withParser(options.parser);
-    initBarrelFilesMap(jscodeshift, options.projectRoot, tsconfig);
+    initBarrelFilesMap(jscodeshift, options["project-root"], tsconfig);
 
     return processFile({ jscodeshift, fileInfo, options, tsconfig });
 };
