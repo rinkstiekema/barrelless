@@ -122,7 +122,8 @@ const findMatchingIndexFile = (basePath: string): string => {
  * @param {string} options.symbol - The imported symbol name
  * @param {string} options.sourceFilePath - The file containing the import
  * @param {string} options.importSpecifier - The import specifier (e.g., '@/modules/shared')
- * @param {number} options.importPosition - The position of the import in the source file
+ * @param {number} options.importPosition - The position of the import in the source file (used only as fallback)
+ * @param {number|undefined} options.exactPosition - The exact character position of the symbol (if known)
  * @returns {string|null} - The file path of the original declaration or null if not found
  */
 const findSymbolDeclaration = ({
@@ -130,6 +131,7 @@ const findSymbolDeclaration = ({
     sourceFilePath,
     importSpecifier,
     importPosition,
+    exactPosition,
 }: SymbolDeclaration): string | null => {
     const { tsLanguageService } = programCache;
     if (!tsLanguageService) {
@@ -138,25 +140,33 @@ const findSymbolDeclaration = ({
     }
 
     try {
-        // Read source file
-        const sourceFileText = fs.readFileSync(sourceFilePath, "utf8");
+        let symbolPosition: number;
 
-        // Find the position of the symbol in the import declaration
-        // For simplicity, we'll search for the symbol name
-        const symbolMatch = new RegExp(`\\b${symbol}\\b`);
-        const match = symbolMatch.exec(
-            sourceFileText.substring(importPosition)
-        );
+        // If exact position is provided, use it directly
+        if (exactPosition !== undefined) {
+            symbolPosition = exactPosition;
+        } else {
+            // Otherwise, fall back to searching for the symbol using regex
+            // Read source file
+            const sourceFileText = fs.readFileSync(sourceFilePath, "utf8");
 
-        if (!match) {
-            console.warn(
-                `Could not find symbol '${symbol}' at position ${importPosition} in ${sourceFilePath}`
+            // Find the position of the symbol in the import declaration
+            // For simplicity, we'll search for the symbol name
+            const symbolMatch = new RegExp(`\\b${symbol}\\b`);
+            const match = symbolMatch.exec(
+                sourceFileText.substring(importPosition)
             );
-            return null;
-        }
 
-        // Calculate actual position
-        const symbolPosition = importPosition + match.index;
+            if (!match) {
+                console.warn(
+                    `Could not find symbol '${symbol}' at position ${importPosition} in ${sourceFilePath}`
+                );
+                return null;
+            }
+
+            // Calculate actual position
+            symbolPosition = importPosition + match.index;
+        }
 
         // Get definition using TS language service
         const definitions = tsLanguageService.getDefinitionAtPosition(
@@ -451,7 +461,7 @@ const findBarrelFiles = (
  * Extract imported symbols from an import declaration
  *
  * @param {ImportDeclaration} importNode - The import declaration node
- * @returns {ImportSymbol[]} - Array of objects containing symbol names and their aliases
+ * @returns {ImportSymbol[]} - Array of objects containing symbol names, their aliases, and positions
  */
 const getImportedSymbols = (importNode: ImportDeclaration): ImportSymbol[] => {
     const symbols: ImportSymbol[] = [];
@@ -470,6 +480,8 @@ const getImportedSymbols = (importNode: ImportDeclaration): ImportSymbol[] => {
                 localName: defaultSpecifier.local.name,
                 type: "default",
                 hasAlias: false,
+                position: defaultSpecifier.local.loc?.start.column,
+                line: defaultSpecifier.local.loc?.start.line,
             });
         }
     }
@@ -489,6 +501,12 @@ const getImportedSymbols = (importNode: ImportDeclaration): ImportSymbol[] => {
                         hasAlias:
                             specifier.imported &&
                             specifier.imported.name !== specifier.local.name,
+                        position:
+                            specifier.imported?.loc?.start.column ||
+                            specifier.local.loc?.start.column,
+                        line:
+                            specifier.imported?.loc?.start.line ||
+                            specifier.local.loc?.start.line,
                     });
                 }
             });
@@ -509,6 +527,8 @@ const getImportedSymbols = (importNode: ImportDeclaration): ImportSymbol[] => {
                 localName: namespaceSpecifier.local.name,
                 type: "namespace",
                 hasAlias: false,
+                position: namespaceSpecifier.local.loc?.start.column,
+                line: namespaceSpecifier.local.loc?.start.line,
             });
         }
     }
@@ -561,14 +581,53 @@ const getShortestImportPath = (
     const relativeToRootPath = path.relative(projectRoot, declarationFilePath);
 
     // Get the direct relative path from the importing file to the declaration file
-    const directRelativePath = path.relative(
+    let directRelativePath = path.relative(
         path.dirname(sourceFilePath),
         declarationFilePath
     );
 
+    // Direct path at this point is a relative path with "../", or an absolute path from the source file
+    // Prefix with "./" if it doesn't already start with "../"
+    if (!directRelativePath.startsWith(".")) {
+        directRelativePath = `./${directRelativePath}`;
+    }
+
     return directRelativePath.length < relativeToRootPath.length
         ? directRelativePath
         : relativeToRootPath;
+};
+
+/**
+ * Get the exact character position of a symbol in a file
+ *
+ * @param symbol - The imported symbol with position information
+ * @param filePath - Path to the file containing the symbol
+ * @returns The exact character position or undefined if it cannot be determined
+ */
+const getExactSymbolPosition = (
+    symbol: ImportSymbol,
+    filePath: string
+): number | undefined => {
+    if (symbol.position === undefined || symbol.line === undefined) {
+        return undefined;
+    }
+
+    // Use TypeScript to get the source file and convert line/column to position
+    const { tsProgram } = programCache;
+    if (!tsProgram) {
+        return undefined;
+    }
+
+    const sourceFile = tsProgram.getSourceFile(filePath);
+    if (!sourceFile) {
+        return undefined;
+    }
+
+    // Use TypeScript's API to get the position from line/column
+    return sourceFile.getPositionOfLineAndCharacter(
+        symbol.line - 1, // TS is 0-based, JSCodeshift is 1-based
+        symbol.position
+    );
 };
 
 /**
@@ -611,8 +670,6 @@ const processImports = ({
             throw new Error("Import source is not a string");
         }
 
-        const nodePosition = importPath.node.loc?.start.line || 0;
-
         // Handle both relative imports and alias imports
         try {
             // Resolve the absolute path of the imported file
@@ -643,11 +700,18 @@ const processImports = ({
 
                 // Use TS Language Service to find the original declaration for each symbol
                 symbols.forEach((symbol) => {
+                    // Get the exact position of the symbol
+                    const exactPosition = getExactSymbolPosition(
+                        symbol,
+                        fileInfo.path
+                    );
+
                     const declarationFile = findSymbolDeclaration({
                         symbol: symbol.name,
                         sourceFilePath: fileInfo.path,
                         importSpecifier: importSource,
-                        importPosition: nodePosition,
+                        importPosition: importPath.node.loc?.start.line || 0, // Fallback if exactPosition is undefined
+                        exactPosition,
                     });
 
                     barrelImportInfo.symbols.push({

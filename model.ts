@@ -22,6 +22,7 @@ export type SymbolDeclaration = {
     sourceFilePath: string;
     importSpecifier: string;
     importPosition: number;
+    exactPosition?: number;
 };
 
 export type ImportSymbol = {
@@ -29,6 +30,8 @@ export type ImportSymbol = {
     localName: string;
     type: string;
     hasAlias: boolean;
+    position?: number; // Column position
+    line?: number; // Line number
 };
 
 export type BarrelImportInfo = {
