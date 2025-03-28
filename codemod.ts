@@ -545,6 +545,33 @@ const initBarrelFilesMap = (
 };
 
 /**
+ * Generate and return the shortest path between a relative path and a project-root-relative path
+ *
+ * @param {string} sourceFilePath - Path of the file containing the import
+ * @param {string} declarationFilePath - Path of the declaration file
+ * @param {string} projectRoot - Root directory of the project
+ * @returns {string} - The shortest import path, either an absolute path or a relative path
+ */
+const getShortestImportPath = (
+    sourceFilePath: string,
+    declarationFilePath: string,
+    projectRoot: string
+): string => {
+    // Get the relative path from project root to the declaration file
+    const relativeToRootPath = path.relative(projectRoot, declarationFilePath);
+
+    // Get the direct relative path from the importing file to the declaration file
+    const directRelativePath = path.relative(
+        path.dirname(sourceFilePath),
+        declarationFilePath
+    );
+
+    return directRelativePath.length < relativeToRootPath.length
+        ? directRelativePath
+        : relativeToRootPath;
+};
+
+/**
  * Process imports to identify barrel imports and prepare replacement information
  *
  * @param {object} context - The context for processing imports
@@ -677,9 +704,22 @@ const processImports = ({
                         );
                     });
 
+                    // Find the actual declaration file path by combining project root with the relative path
+                    const fullDeclarationPath = path.join(
+                        projectRoot,
+                        declarationPath
+                    );
+
+                    // A relative path from the current file could be shorter than a relative path from the project root
+                    const shortestPath = getShortestImportPath(
+                        fileInfo.path,
+                        fullDeclarationPath,
+                        projectRoot
+                    );
+
                     newImports.push({
                         specifiers,
-                        source: declarationPath,
+                        source: shortestPath,
                     });
                 });
 
