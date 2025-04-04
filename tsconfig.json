@@ -7,8 +7,12 @@
         "esModuleInterop": true,
         "skipLibCheck": true,
         "forceConsistentCasingInFileNames": true,
-        "moduleResolution": "node"
+        "moduleResolution": "node",
+        "baseUrl": ".",
+        "paths": {
+            "@testfixtures/*": ["__testfixtures__/*"]
+        }
     },
-    "include": ["./**/*.ts", "codemod.ts"],
+    "include": ["./**/*.ts", "barrelless.ts"],
     "exclude": ["node_modules"]
 }

@@ -5,3 +5,6 @@ node_modules/
 .vscode/
 
 todo.md
+barrel-files.json
+
+reports/
