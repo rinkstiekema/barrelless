@@ -20,7 +20,6 @@ export type ProgramCache = {
 export type SymbolDeclaration = {
     symbol: string;
     sourceFilePath: string;
-    importSpecifier: string;
     importPosition: number;
     exactPosition?: number;
 };
