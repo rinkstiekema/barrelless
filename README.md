@@ -107,11 +107,12 @@ import { JSX } from "react";
 
 ## Todo
 
--   [ ] Resolve relatively if relative path is shorter than absolute path
+-   [x] Resolve relatively if relative path is shorter than absolute path
 -   [ ] Keep alias path in resolved path
 -   [ ] Handle barrel file clean up
--   [ ] Improve performance by sharing barrel file map and tsconfig file
--   [ ] Improve performance by sharing typescript server and jscodeshift instance
+-   [x] Improve performance by sharing barrel file through file
+-   [ ] Improve performance by sharing tsconfig file
+-   [ ] Improve performance by sharing typescript server
 -   [ ] Package into npm package
 
 ## License
