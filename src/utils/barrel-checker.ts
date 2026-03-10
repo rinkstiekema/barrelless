@@ -44,10 +44,16 @@ export const getPathAliases = (
         });
 
         return pathAliases;
-    } catch (e) {
-        console.warn(
-            "Failed to load tsconfig.json, assuming no aliases should be considered"
-        );
+    } catch (e: unknown) {
+        if (e instanceof Error) {
+            console.warn(
+                `Failed to load tsconfig.json, assuming no aliases should be considered: ${e.message}`
+            );
+        } else {
+            console.warn(
+                "Failed to load tsconfig.json, assuming no aliases should be considered"
+            );
+        }
         return {};
     }
 };
@@ -168,7 +174,9 @@ const dumpBarrelFilesMap = (projectRoot: string) => {
     }
 };
 
-const loadBarrelFilesMap = (projectRoot: string): Map<string, boolean> | undefined => {
+const loadBarrelFilesMap = (
+    projectRoot: string
+): Map<string, boolean> | undefined => {
     const cacheFile = path.join(projectRoot, "barrel-files.json");
     if (!fs.existsSync(cacheFile)) return;
     const fileContent = JSON.parse(fs.readFileSync(cacheFile, "utf8"));
