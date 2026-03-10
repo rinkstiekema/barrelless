@@ -1,10 +1,56 @@
 import * as path from "path";
 import * as fs from "fs";
 import { JSCodeshift } from "jscodeshift";
-import { ParsedCommandLine } from "typescript";
-import { programCache } from "./program-cache";
-import { DEFAULT_TRANSFORM_OPTIONS, BARREL_FILE_PATTERNS } from "./constants";
-import { getPathAliases } from "./utils"; // Assuming getPathAliases will be moved here
+import { LanguageService, ParsedCommandLine, Program } from "typescript";
+import { DEFAULT_TRANSFORM_OPTIONS } from "./constants";
+
+export type ProgramCache = {
+    // Cache of identified barrel files (path -> boolean)
+    barrelFilesMap: Map<string, boolean>;
+
+    // Stores path aliases from tsconfig.json
+    pathAliases?: Record<string, string>;
+    tsProgram?: Program;
+    tsLanguageService?: LanguageService;
+};
+
+const programCache: ProgramCache = {
+    barrelFilesMap: new Map(),
+    tsProgram: undefined,
+    tsLanguageService: undefined,
+    pathAliases: undefined,
+};
+
+/**
+ * Read and parse tsconfig.json to extract path aliases
+ *
+ * @param {ParsedCommandLine} tsconfig - The parsed tsconfig.json
+ * @returns {Record<string, string>} - Object mapping alias prefixes to their resolved paths
+ */
+export const getPathAliases = (
+    tsconfig: ParsedCommandLine
+): Record<string, string> => {
+    try {
+        const baseUrl = tsconfig.options.baseUrl || ".";
+        const paths = tsconfig.options.paths || {};
+
+        // Convert path mapping patterns to a simpler format for our use
+        const pathAliases: Record<string, string> = {};
+        Object.entries(paths).forEach(([alias, targets]) => {
+            // Remove wildcards from path patterns
+            const cleanAlias = alias.replace(/\/\*$/, "");
+            const cleanTarget = targets[0].replace(/\/\*$/, "");
+            pathAliases[cleanAlias] = path.join(baseUrl, cleanTarget);
+        });
+
+        return pathAliases;
+    } catch (e) {
+        console.warn(
+            "Failed to load tsconfig.json, assuming no aliases should be considered"
+        );
+        return {};
+    }
+};
 
 /**
  * Check if a file is a barrel file by analyzing its content
@@ -139,15 +185,18 @@ const loadBarrelFilesMap = (): Map<string, boolean> | undefined => {
 export const initBarrelFilesMap = (
     jscodeshift: JSCodeshift,
     tsconfig: ParsedCommandLine
-) => {
+): Map<string, boolean> => {
     const barrelFilesMap = loadBarrelFilesMap();
     if (barrelFilesMap) {
         programCache.barrelFilesMap = barrelFilesMap;
-        return;
+        return barrelFilesMap;
     }
 
     // Initialize path aliases
-    getPathAliases(tsconfig);
+    if (!programCache.pathAliases) {
+        programCache.pathAliases = getPathAliases(tsconfig);
+    }
+
     // Use files from tsconfig instead of scanning directories
     for (const filePath of tsconfig.fileNames) {
         const absoluteFilePath = path.resolve(filePath);
@@ -162,4 +211,5 @@ export const initBarrelFilesMap = (
     }
 
     dumpBarrelFilesMap();
+    return loadBarrelFilesMap()!;
 };

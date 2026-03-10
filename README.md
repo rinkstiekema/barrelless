@@ -1,119 +1,119 @@
 # 🛢️ Barrelless
 
-A [`jscodeshift`](https://jscodeshift.com/) codemod to eliminate barrel files and refactor imports in TypeScript projects.
+A [jscodeshift](https://github.com/facebook/jscodeshift) codemod that eliminates barrel file imports and replaces them with direct imports to the actual source files — automatically, using the TypeScript compiler to trace every symbol back to where it's really defined.
 
-## Why eliminate barrel files?
+**Before:**
 
-While barrel files (index.ts files that re-export components) help you structure your codebase, they can also cause issues:
-
--   Slow down build times
--   Create circular dependencies
--   Increase bundle size due to poor tree-shaking, importing from a barrel file immediately imports all its exported paths
-
-Some sources for more in-depth details:
-
--   https://tkdodo.eu/blog/please-stop-using-barrel-files
--   https://uglow.medium.com/burn-the-barrel-c282578f21b6
--   https://flaming.codes/en/posts/barrel-files-in-javascript/
-
-## How does it work?
-
-Barrelless automatically:
-
--   Identifies barrel files in your project
--   Traverses your project to identify imports using barrel files
--   Resolves the import to the path of the original source file
--   Rewrites imports to reference original paths directly
-
-## Installation
-
-```bash
-npm install -g jscodeshift
-npm install
-# or
-pnpm add -g jscodeshift
-pnpm install
-# or
-yarn global add jscodeshift
-yarn install
+```ts
+import { Button, Card, Modal } from "./components";
+import { Input as TextInput } from "./components";
 ```
 
-## Usage
+**After:**
 
-Navigate into this repository's directory and run:
+```ts
+import { Button } from "./components/Button";
+import { Card } from "./components/Card";
+import { Modal } from "./components/Modal";
+import { Input as TextInput } from "./components/Input";
+```
+
+## Why remove barrel files?
+
+Barrel files (`index.ts` files that re-export modules) seem convenient but cause real problems as your project grows:
+
+-   **Slow builds** — importing one symbol forces the bundler to process everything the barrel re-exports
+-   **Poor tree-shaking** — bundlers can't reliably eliminate dead code through re-exports
+-   **Circular dependencies** — barrel files are a common source of hard-to-debug import cycles
+
+This codemod automates the migration so you don't have to update hundreds of imports by hand.
+
+Further reading:
+
+-   [Please stop using barrel files – TkDodo](https://tkdodo.eu/blog/please-stop-using-barrel-files)
+-   [Burn the barrel – Medium](https://uglow.medium.com/burn-the-barrel-c282578f21b6)
+
+## How it works
+
+1. **TypeScript service** — loads your `tsconfig.json` and initializes the TypeScript compiler API to resolve module paths and look up symbol declarations
+2. **Barrel detection** — scans all project files and marks any file containing only import/export statements as a barrel file, caching the result in `barrel-files.json` for subsequent runs
+3. **Import filtering** — for each `import` statement in the file being transformed, resolves the path and checks whether it points to a barrel file
+4. **Rewriting** — replaces each matching barrel import with one direct `import` per specifier, pointing straight at the source file where the symbol is defined
+
+## Getting started
+
+**Install dependencies:**
 
 ```bash
-npx jscodeshift /some/path/modules \
-  --transform=codemod.ts \
-  --project-root=/some/path \
+npm install
+```
+
+**Run the codemod on your project:**
+
+```bash
+npx jscodeshift -t src/barrelless.ts <path-to-your-files> \
+  --project-root=<your-project-root> \
   --quote-style=single
 ```
 
+Pass `--dry` to preview changes without writing anything to disk.
+
 ### Options
 
--   `--project-root`: Root directory of your project (default: current directory)
--   `--quote-style`: Quote style to use in the generated imports ('single' or 'double', default: 'single')
+| Option             | Description                                                   | Default           |
+| ------------------ | ------------------------------------------------------------- | ----------------- |
+| `--project-root`   | Root of your TypeScript project (where `tsconfig.json` lives) | current directory |
+| `--quote-style`    | Quote style for generated imports (`single` or `double`)      | `single`          |
+| `--parser`         | jscodeshift parser to use (`ts` or `tsx`)                     | `tsx`             |
+| `--ignore-pattern` | Glob pattern of files to skip                                 | —                 |
 
-### Useful jscodeshift options
+## Development
 
-You may want to use one of the following arguments when running the codemod:
+**Run all tests:**
 
--   `--parser=<'ts'|'tsx'>`: Allows you to specify the parser to use for parsing the source files
--   `--ignore-pattern=[GLOB]`: Allows you to ignore files that match a provided glob expression
-
-## Example
-
-Before:
-
-```typescript
-// Using barrel import
-import { Button, Card, Modal } from "./components";
-
-// Using alias import
-import { Input as TextInput } from "./components";
-
-// Using alias path
-import { useData } from "@shared/hooks";
-
-// Using direct import
-import { Typography } from "./components/Typography";
-
-// Targeting node module
-import { JSX } from "react";
+```bash
+npm test
 ```
 
-After:
+**Run a specific test fixture:**
 
-```typescript
-// Direct imports to source files
-import { Button } from "modules/components/Button";
-import { Card } from "modules/components/Card";
-import { Modal } from "modules/components/Modal";
-
-// Resolves alias imports
-import { Input as TextInput } from "./components/Input";
-
-/**
- *  Handles alias paths
- *  TODO: Keep alias path in resolved path, example:
- *  import { useData } from "@shared/hooks/useData";
- */
-import { useData } from "modules/shared/hooks/useData";
-
-// Leaves other imports as is
-import { Typography } from "./components/Typography";
-import { JSX } from "react";
+```bash
+npx jest --testPathPattern="tests"
 ```
 
-## Todo
+Tests use `ts-jest` and jscodeshift's `defineTest` helper. Each fixture provides an input file, an expected output file, and a small TypeScript project for the codemod to analyse.
 
--   [x] Resolve relatively if relative path is shorter than absolute path
--   [ ] Keep alias path in resolved path
--   [ ] Handle barrel file clean up
--   [x] Improve performance by sharing barrel file through file
--   [ ] Improve performance by sharing tsconfig file
--   [ ] Improve performance by sharing typescript server
--   [ ] Package into npm package
+## Project structure
+
+```
+src/
+  barrelless.ts             # Entry point — exports the jscodeshift transform
+  model.ts                  # Shared types (TransformOptions, ImportSymbol, etc.)
+  utils/
+    ts-service.ts           # TypeScript program & language service initialisation
+    barrel-checker.ts       # Identifies barrel files, caches in barrel-files.json
+    import-check.ts         # Checks whether a resolved path is a barrel file
+    import-transform.ts     # Core rewrite logic — barrel import → direct imports
+
+__testfixtures__/           # One directory per test scenario
+  <scenario>/
+    default.input.ts        # Source file before the transform
+    default.output.ts       # Expected source file after the transform
+    lib/index.ts            # Barrel file used in the scenario
+    lib/<Module>.ts         # Actual source modules the barrel re-exports
+
+__tests__/
+  tests.ts                  # Test suite wired up with jscodeshift's defineTest
+```
+
+## Roadmap
+
+[x] Resolve to relative path when it's shorter than the absolute path
+[x] Share barrel file map across files for performance
+[ ] Preserve path aliases in resolved imports (e.g. `@shared/hooks/useData`)
+[ ] Clean up barrel files after rewriting all imports
+[ ] Share TypeScript program instance across files
+[ ] Publish as an npm package
 
 ## License
 

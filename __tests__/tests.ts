@@ -1,45 +1,53 @@
 import { defineTest } from "jscodeshift/src/testUtils";
 
-defineTest(__dirname, "barrelless", null, "absolute-import/default", {
+defineTest(__dirname, "src/barrelless", null, "absolute-import/default", {
     parser: "ts",
 });
 
-defineTest(__dirname, "barrelless", null, "alias-import/default", {
+defineTest(__dirname, "src/barrelless", null, "alias-import/default", {
     parser: "ts",
 });
 
-defineTest(__dirname, "barrelless", null, "circular-reexport/default", {
+defineTest(__dirname, "src/barrelless", null, "circular-reexport/default", {
     parser: "ts",
 });
 
-defineTest(__dirname, "barrelless", null, "deep-import/default", {
+defineTest(__dirname, "src/barrelless", null, "deep-import/default", {
     parser: "ts",
 });
 
-defineTest(__dirname, "barrelless", null, "default-export/default", {
+defineTest(__dirname, "src/barrelless", null, "default-export/default", {
     parser: "ts",
 });
 
-defineTest(__dirname, "barrelless", null, "mixed-import/default", {
+defineTest(__dirname, "src/barrelless", null, "mixed-import/default", {
     parser: "ts",
 });
 
-defineTest(__dirname, "barrelless", null, "namespace-import/default", {
+defineTest(__dirname, "src/barrelless", null, "namespace-import/default", {
     parser: "ts",
 });
 
-defineTest(__dirname, "barrelless", null, "reexport-chain/default", {
+defineTest(__dirname, "src/barrelless", null, "reexport-chain/default", {
     parser: "ts",
 });
 
-defineTest(__dirname, "barrelless", null, "relative-import/default", {
+defineTest(__dirname, "src/barrelless", null, "relative-import/default", {
     parser: "ts",
 });
 
-defineTest(__dirname, "barrelless", null, "renamed-import/default", {
+defineTest(__dirname, "src/barrelless", null, "renamed-import/default", {
     parser: "ts",
 });
 
-defineTest(__dirname, "barrelless", null, "type-only-import/default", {
+defineTest(__dirname, "src/barrelless", null, "type-only-import/default", {
+    parser: "ts",
+});
+
+defineTest(__dirname, "src/barrelless", null, "no-transform/default", {
+    parser: "ts",
+});
+
+defineTest(__dirname, "src/barrelless", null, "multiple-barrels/default", {
     parser: "ts",
 });

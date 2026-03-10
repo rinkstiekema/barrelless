@@ -1,7 +1,4 @@
-import { TransformOptions } from "./model";
-
-// Common barrel file patterns
-export const BARREL_FILE_PATTERNS = ["index.ts"];
+import { TransformOptions } from "../model";
 
 // Default transform options
 export const DEFAULT_TRANSFORM_OPTIONS: TransformOptions = {
