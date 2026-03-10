@@ -9,19 +9,28 @@ import ts, {
 import { ImportSymbol } from "../model";
 import path from "path";
 
-/**
- * Initialize TypeScript program and language service
- * @param {string} projectRoot - The root directory of the project
- */
-export const getTypescriptService = (
-    projectRoot: string
-): {
+type TSServiceResult = {
     tsConfig: ParsedCommandLine;
     tsProgram: Program;
     tsLanguageService: LanguageService;
     tsCompilerHost: CompilerHost;
-} => {
-    const tsConfig = getTSConfig(projectRoot);
+};
+
+const tsServiceCache = new Map<string, TSServiceResult>();
+
+/**
+ * Initialize TypeScript program and language service (cached per tsconfig path)
+ * @param {string} projectRoot - The root directory of the project
+ * @param {string} tsconfigFileName - The tsconfig filename (default: "tsconfig.json")
+ */
+export const getTypescriptService = (
+    projectRoot: string,
+    tsconfigFileName = "tsconfig.json"
+): TSServiceResult => {
+    const cacheKey = path.join(projectRoot, tsconfigFileName);
+    if (tsServiceCache.has(cacheKey)) return tsServiceCache.get(cacheKey)!;
+
+    const tsConfig = getTSConfig(projectRoot, tsconfigFileName);
 
     const tsProgram = ts.createProgram(tsConfig.fileNames, tsConfig.options);
 
@@ -54,11 +63,13 @@ export const getTypescriptService = (
         ? ts.createCompilerHost(tsProgram.getCompilerOptions(), true)
         : ts.createCompilerHost(tsProgram.getCompilerOptions());
 
-    return { tsConfig, tsProgram, tsLanguageService, tsCompilerHost };
+    const result = { tsConfig, tsProgram, tsLanguageService, tsCompilerHost };
+    tsServiceCache.set(cacheKey, result);
+    return result;
 };
 
-export const getTSConfig = (projectRoot: string): ParsedCommandLine => {
-    const tsconfigPath = path.join(projectRoot, "tsconfig.json");
+export const getTSConfig = (projectRoot: string, tsconfigFileName = "tsconfig.json"): ParsedCommandLine => {
+    const tsconfigPath = path.join(projectRoot, tsconfigFileName);
     if (!fs.existsSync(tsconfigPath)) {
         throw new Error("tsconfig.json not found");
     }

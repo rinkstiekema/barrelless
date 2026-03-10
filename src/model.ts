@@ -4,6 +4,7 @@ export type TransformOptions = {
     parser: string | Parser;
     "project-root": string;
     "quote-style": "single" | "double";
+    "tsconfig-path": string;
 };
 
 export type SymbolDeclaration = {

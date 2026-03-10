@@ -60,12 +60,13 @@ Pass `--dry` to preview changes without writing anything to disk.
 
 ### Options
 
-| Option             | Description                                                   | Default           |
-| ------------------ | ------------------------------------------------------------- | ----------------- |
-| `--project-root`   | Root of your TypeScript project (where `tsconfig.json` lives) | current directory |
-| `--quote-style`    | Quote style for generated imports (`single` or `double`)      | `single`          |
-| `--parser`         | jscodeshift parser to use (`ts` or `tsx`)                     | `tsx`             |
-| `--ignore-pattern` | Glob pattern of files to skip                                 | —                 |
+| Option             | Description                                                   | Default            |
+| ------------------ | ------------------------------------------------------------- | ------------------ |
+| `--project-root`   | Root of your TypeScript project (where `tsconfig.json` lives) | current directory  |
+| `--tsconfig-path`  | Path to the tsconfig file relative to `--project-root`        | `tsconfig.json`    |
+| `--quote-style`    | Quote style for generated imports (`single` or `double`)      | `double`           |
+| `--parser`         | jscodeshift parser to use (`ts` or `tsx`)                     | `tsx`              |
+| `--ignore-pattern` | Glob pattern of files to skip                                 | —                  |
 
 ## Development
 
@@ -110,9 +111,9 @@ __tests__/
 
 [x] Resolve to relative path when it's shorter than the absolute path
 [x] Share barrel file map across files for performance
+[x] Share TypeScript program instance across files
 [ ] Preserve path aliases in resolved imports (e.g. `@shared/hooks/useData`)
 [ ] Clean up barrel files after rewriting all imports
-[ ] Share TypeScript program instance across files
 [ ] Publish as an npm package
 
 ## License

@@ -140,7 +140,7 @@ export const isBarrelFile = (
     }
 };
 
-const dumpBarrelFilesMap = () => {
+const dumpBarrelFilesMap = (projectRoot: string) => {
     const barrelFilesMap = programCache.barrelFilesMap;
 
     // Convert Map to a serializable object
@@ -149,15 +149,15 @@ const dumpBarrelFilesMap = () => {
         barrelFilesObject[filePath] = isBarrel;
     });
 
-    // Write to barrel-files.json
+    const cacheFile = path.join(projectRoot, "barrel-files.json");
     try {
         fs.writeFileSync(
-            "barrel-files.json",
+            cacheFile,
             JSON.stringify(barrelFilesObject, null, 2),
             "utf8"
         );
         console.log(
-            `Barrel files information written to barrel-files.json. Found ${
+            `Barrel files information written to ${cacheFile}. Found ${
                 Object.values(barrelFilesObject).filter(Boolean).length
             } barrel files out of ${
                 Object.keys(barrelFilesObject).length
@@ -168,11 +168,10 @@ const dumpBarrelFilesMap = () => {
     }
 };
 
-const loadBarrelFilesMap = (): Map<string, boolean> | undefined => {
-    if (!fs.existsSync("barrel-files.json")) return;
-    const fileContent = JSON.parse(
-        fs.readFileSync("barrel-files.json", "utf8")
-    );
+const loadBarrelFilesMap = (projectRoot: string): Map<string, boolean> | undefined => {
+    const cacheFile = path.join(projectRoot, "barrel-files.json");
+    if (!fs.existsSync(cacheFile)) return;
+    const fileContent = JSON.parse(fs.readFileSync(cacheFile, "utf8"));
     return new Map<string, boolean>(Object.entries(fileContent));
 };
 
@@ -180,13 +179,15 @@ const loadBarrelFilesMap = (): Map<string, boolean> | undefined => {
  * Initialize the global barrel files list by scanning target directories
  *
  * @param {JSCodeshift} jscodeshift - The jscodeshift instance
+ * @param {ParsedCommandLine} tsconfig - The parsed tsconfig
  * @param {string} projectRoot - The root directory of the project
  */
 export const initBarrelFilesMap = (
     jscodeshift: JSCodeshift,
-    tsconfig: ParsedCommandLine
+    tsconfig: ParsedCommandLine,
+    projectRoot: string
 ): Map<string, boolean> => {
-    const barrelFilesMap = loadBarrelFilesMap();
+    const barrelFilesMap = loadBarrelFilesMap(projectRoot);
     if (barrelFilesMap) {
         programCache.barrelFilesMap = barrelFilesMap;
         return barrelFilesMap;
@@ -210,6 +211,6 @@ export const initBarrelFilesMap = (
         isBarrelFile(absoluteFilePath, jscodeshift);
     }
 
-    dumpBarrelFilesMap();
-    return loadBarrelFilesMap()!;
+    dumpBarrelFilesMap(projectRoot);
+    return loadBarrelFilesMap(projectRoot)!;
 };

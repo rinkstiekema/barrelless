@@ -4,6 +4,8 @@ import { initBarrelFilesMap } from "./utils/barrel-checker";
 import { getTypescriptService, resolveImportPath } from "./utils/ts-service";
 import { isBarrelImport } from "./utils/import-check";
 import { transformImport } from "./utils/import-transform";
+import { TransformOptions } from "./model";
+import { DEFAULT_TRANSFORM_OPTIONS } from "./utils/constants";
 
 /**
  * Main transform function that jscodeshift will execute
@@ -13,12 +15,16 @@ import { transformImport } from "./utils/import-transform";
  * @param cliOptions - Options passed to the transform
  * @returns The transformed source or undefined if no changes were made
  */
-export const transform = (fileInfo: FileInfo, api: API) => {
+export const transform = (fileInfo: FileInfo, api: API, cliOptions?: Partial<TransformOptions>) => {
+    const options: TransformOptions = { ...DEFAULT_TRANSFORM_OPTIONS, ...cliOptions };
+    const projectRoot = options["project-root"];
+    const quoteStyle = options["quote-style"];
+    const tsconfigPath = options["tsconfig-path"];
+
     const j = api.jscodeshift;
-    // TODO: use projectRoot from cliOptions
     const { tsConfig, tsProgram, tsCompilerHost } =
-        getTypescriptService("__testfixtures__");
-    const barrelFilesMap = initBarrelFilesMap(j, tsConfig);
+        getTypescriptService(projectRoot, tsconfigPath);
+    const barrelFilesMap = initBarrelFilesMap(j, tsConfig, projectRoot);
 
     const imports = j(fileInfo.source).find(j.ImportDeclaration);
 
@@ -47,7 +53,7 @@ export const transform = (fileInfo: FileInfo, api: API) => {
                 tsCompilerHost,
             })
         )
-        .toSource();
+        .toSource({ quote: quoteStyle });
 };
 
 export default transform;
