@@ -56,3 +56,27 @@ defineTest(__dirname, "src/barrelless", cliOptions, "no-transform/default", {
 defineTest(__dirname, "src/barrelless", cliOptions, "multiple-barrels/default", {
     parser: "ts",
 });
+
+defineTest(__dirname, "src/barrelless", cliOptions, "alias-output/default", {
+    parser: "ts",
+});
+
+defineTest(__dirname, "src/barrelless", cliOptions, "alias-multiple-specifiers/default", {
+    parser: "ts",
+});
+
+defineTest(
+    __dirname,
+    "src/barrelless",
+    { ...cliOptions, "use-aliases": false },
+    "alias-disabled/default",
+    { parser: "ts" }
+);
+
+defineTest(__dirname, "src/barrelless", cliOptions, "alias-namespace-output/default", {
+    parser: "ts",
+});
+
+defineTest(__dirname, "src/barrelless", cliOptions, "alias-type-only-output/default", {
+    parser: "ts",
+});

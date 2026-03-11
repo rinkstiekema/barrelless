@@ -1,3 +1,3 @@
-import { Project } from "./lib/Project";
+import { Project } from "@alias-import/lib/Project";
 
 const p = new Project();
