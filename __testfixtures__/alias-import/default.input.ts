@@ -1,3 +1,3 @@
-import { Project } from "__testfixtures__/alias-import/lib";
+import { Project } from "@alias-import/lib";
 
 const p = new Project();

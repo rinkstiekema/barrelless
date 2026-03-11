@@ -8,7 +8,7 @@ import {
     ImportSpecifier,
 } from "jscodeshift";
 
-import { CompilerHost, Program } from "typescript";
+import ts, { CompilerHost, Program } from "typescript";
 import path from "path";
 import { findSymbolDeclaration, resolveImportPath } from "./ts-service";
 
@@ -17,6 +17,76 @@ type ImportSpecifierType =
     | ImportDefaultSpecifier
     | ImportNamespaceSpecifier;
 
+const getModuleSpecifierViaTS = (
+    declarationFilePath: string,
+    importingSourceFile: ts.SourceFile,
+    program: ts.Program,
+    compilerHost: ts.CompilerHost
+): string | null => {
+    const tsInternal = ts as any;
+    if (!tsInternal.moduleSpecifiers?.getModuleSpecifiers) return null;
+
+    const checker = program.getTypeChecker();
+    const declarationSourceFile = program.getSourceFile(declarationFilePath);
+    if (!declarationSourceFile) return null;
+
+    const moduleSymbol = checker.getSymbolAtLocation(declarationSourceFile);
+    if (!moduleSymbol) return null;
+
+    const prog = program as any;
+    const msHost = {
+        fileExists: (f: string) => prog.fileExists(f),
+        getCurrentDirectory: () => compilerHost.getCurrentDirectory(),
+        readFile: (f: string) => compilerHost.readFile(f),
+        useCaseSensitiveFileNames: () => ts.sys.useCaseSensitiveFileNames,
+        getSymlinkCache: () => prog.getSymlinkCache?.(),
+        getModuleSpecifierCache: () => undefined,
+        getPackageJsonInfoCache: () =>
+            prog.getModuleResolutionCache?.()?.getPackageJsonInfoCache?.(),
+        redirectTargetsMap: prog.redirectTargetsMap,
+        getRedirectFromSourceFile: (f: string) => prog.getRedirectFromSourceFile?.(f),
+        isSourceOfProjectReferenceRedirect: (f: string) =>
+            prog.isSourceOfProjectReferenceRedirect?.(f),
+        getFileIncludeReasons: () => prog.getFileIncludeReasons?.(),
+        getCommonSourceDirectory: () => prog.getCommonSourceDirectory?.(),
+        getDefaultResolutionModeForFile: (f: any) =>
+            prog.getDefaultResolutionModeForFile?.(f),
+        getModeForResolutionAtIndex: (f: any, index: number) =>
+            prog.getModeForResolutionAtIndex?.(f, index),
+    };
+
+    const userPreferences = {
+        importModuleSpecifierPreference: "non-relative" as const,
+        importModuleSpecifierEnding: "index" as const,
+    };
+
+    try {
+        const specifiers: string[] = tsInternal.moduleSpecifiers.getModuleSpecifiers(
+            moduleSymbol,
+            checker,
+            program.getCompilerOptions(),
+            importingSourceFile,
+            msHost,
+            userPreferences
+        );
+        const specifier = specifiers?.[0];
+        if (!specifier) return null;
+
+        // Only accept the result if it actually matches a configured paths alias.
+        // Without this check, TS falls back to baseUrl-relative paths (e.g. "lib/Foo")
+        // when no alias covers the file, which looks like a bare module specifier.
+        const configuredPaths = program.getCompilerOptions().paths ?? {};
+        const matchesAlias = Object.keys(configuredPaths).some((pattern) => {
+            const isWildcard = pattern.endsWith("/*");
+            const prefix = isWildcard ? pattern.slice(0, -2) : pattern;
+            return isWildcard ? specifier.startsWith(prefix + "/") : specifier === prefix;
+        });
+        return matchesAlias ? specifier : null;
+    } catch {
+        return null;
+    }
+};
+
 // Transforms a barrel import into a direct import
 export const transformImport = ({
     importDeclaration,
@@ -24,12 +94,14 @@ export const transformImport = ({
     j,
     tsProgram,
     tsCompilerHost,
+    useAliases,
 }: {
     importDeclaration: ASTPath<ImportDeclaration>;
     fileInfo: FileInfo;
     j: API["jscodeshift"];
     tsProgram: Program;
     tsCompilerHost: CompilerHost;
+    useAliases: boolean;
 }): ImportDeclaration[] => {
     // If the import declaration has no specifiers, it can be removed as barrel files should have no side effects
     if (!importDeclaration.node.specifiers) return [];
@@ -42,7 +114,8 @@ export const transformImport = ({
                 specifier,
                 fileInfo,
                 tsProgram,
-                tsCompilerHost
+                tsCompilerHost,
+                useAliases
             );
             if (!directImport) return;
 
@@ -67,7 +140,8 @@ const getDirectImport = (
     specifier: ImportSpecifierType,
     fileInfo: FileInfo,
     program: Program,
-    tsCompilerHost: CompilerHost
+    tsCompilerHost: CompilerHost,
+    useAliases: boolean
 ): string | null => {
     // The TS program/service stores files with paths relative to CWD (from getTypescriptService).
     // fileInfo.path from jscodeshift is absolute, so normalize it to be relative to CWD.
@@ -77,7 +151,13 @@ const getDirectImport = (
     if (specifier.type === "ImportNamespaceSpecifier") {
         const importSource = importDeclaration.node.source.value as string;
         const barrelPath = resolveImportPath(importSource, sourceFilePath, program, tsCompilerHost);
-        return toRelativeImportPath(path.resolve(sourceFilePath), path.resolve(barrelPath));
+        const absBarrelPath = path.resolve(barrelPath);
+        if (useAliases) {
+            const importingSourceFile = program.getSourceFile(sourceFilePath)!;
+            const aliased = getModuleSpecifierViaTS(absBarrelPath, importingSourceFile, program, tsCompilerHost);
+            if (aliased) return aliased;
+        }
+        return toRelativeImportPath(path.resolve(sourceFilePath), absBarrelPath);
     }
 
     // Named or default: find the actual declaration file via TS language service.
@@ -94,7 +174,13 @@ const getDirectImport = (
     const declarationFilePath = findSymbolDeclaration(barrelFilePath, symbolName, program);
 
     if (!declarationFilePath) return null;
-    return toRelativeImportPath(path.resolve(sourceFilePath), path.resolve(declarationFilePath));
+    const absDeclarationPath = path.resolve(declarationFilePath);
+    if (useAliases) {
+        const importingSourceFile = program.getSourceFile(sourceFilePath)!;
+        const aliased = getModuleSpecifierViaTS(absDeclarationPath, importingSourceFile, program, tsCompilerHost);
+        if (aliased) return aliased;
+    }
+    return toRelativeImportPath(path.resolve(sourceFilePath), absDeclarationPath);
 };
 
 const buildImportDeclaration = (

@@ -20,6 +20,7 @@ export const transform = (fileInfo: FileInfo, api: API, cliOptions?: Partial<Tra
     const projectRoot = options["project-root"];
     const quoteStyle = options["quote-style"];
     const tsconfigPath = options["tsconfig-path"];
+    const useAliases = options["use-aliases"] ?? true;
 
     const j = api.jscodeshift;
     const { tsConfig, tsProgram, tsCompilerHost } =
@@ -51,6 +52,7 @@ export const transform = (fileInfo: FileInfo, api: API, cliOptions?: Partial<Tra
                 j,
                 tsProgram,
                 tsCompilerHost,
+                useAliases,
             })
         )
         .toSource({ quote: quoteStyle });

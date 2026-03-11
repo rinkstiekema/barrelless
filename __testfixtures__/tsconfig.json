@@ -10,7 +10,11 @@
         "moduleResolution": "node",
         "baseUrl": ".",
         "paths": {
-            "__testfixtures__/*": ["./*"]
+            "@alias-import/*": ["./alias-import/*"],
+            "@alias-output/*": ["./alias-output/*"],
+            "@alias-multiple/*": ["./alias-multiple-specifiers/*"],
+            "@alias-namespace-output/*": ["./alias-namespace-output/*"],
+            "@alias-type-only-output/*": ["./alias-type-only-output/*"]
         }
     },
     "include": ["./**/*.ts"],

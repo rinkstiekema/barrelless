@@ -5,6 +5,7 @@ export type TransformOptions = {
     "project-root": string;
     "quote-style": "single" | "double";
     "tsconfig-path": string;
+    "use-aliases"?: boolean;
 };
 
 export type SymbolDeclaration = {

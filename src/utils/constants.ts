@@ -6,4 +6,5 @@ export const DEFAULT_TRANSFORM_OPTIONS: TransformOptions = {
     "project-root": process.cwd(),
     "quote-style": "double" as const,
     "tsconfig-path": "tsconfig.json",
+    "use-aliases": true,
 };
