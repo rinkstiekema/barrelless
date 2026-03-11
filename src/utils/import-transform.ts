@@ -23,6 +23,7 @@ const getModuleSpecifierViaTS = (
     program: ts.Program,
     compilerHost: ts.CompilerHost
 ): string | null => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- intentional: accessing ts.moduleSpecifiers which is not part of the public .d.ts API
     const tsInternal = ts as any;
     if (!tsInternal.moduleSpecifiers?.getModuleSpecifiers) return null;
 
@@ -33,6 +34,7 @@ const getModuleSpecifierViaTS = (
     const moduleSymbol = checker.getSymbolAtLocation(declarationSourceFile);
     if (!moduleSymbol) return null;
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- intentional: accessing internal Program members not exposed in the public .d.ts API
     const prog = program as any;
     const msHost = {
         fileExists: (f: string) => prog.fileExists(f),
@@ -44,13 +46,16 @@ const getModuleSpecifierViaTS = (
         getPackageJsonInfoCache: () =>
             prog.getModuleResolutionCache?.()?.getPackageJsonInfoCache?.(),
         redirectTargetsMap: prog.redirectTargetsMap,
-        getRedirectFromSourceFile: (f: string) => prog.getRedirectFromSourceFile?.(f),
+        getRedirectFromSourceFile: (f: string) =>
+            prog.getRedirectFromSourceFile?.(f),
         isSourceOfProjectReferenceRedirect: (f: string) =>
             prog.isSourceOfProjectReferenceRedirect?.(f),
         getFileIncludeReasons: () => prog.getFileIncludeReasons?.(),
         getCommonSourceDirectory: () => prog.getCommonSourceDirectory?.(),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- intentional: parameter type not available in public .d.ts API
         getDefaultResolutionModeForFile: (f: any) =>
             prog.getDefaultResolutionModeForFile?.(f),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- intentional: parameter type not available in public .d.ts API
         getModeForResolutionAtIndex: (f: any, index: number) =>
             prog.getModeForResolutionAtIndex?.(f, index),
     };
@@ -61,14 +66,15 @@ const getModuleSpecifierViaTS = (
     };
 
     try {
-        const specifiers: string[] = tsInternal.moduleSpecifiers.getModuleSpecifiers(
-            moduleSymbol,
-            checker,
-            program.getCompilerOptions(),
-            importingSourceFile,
-            msHost,
-            userPreferences
-        );
+        const specifiers: string[] =
+            tsInternal.moduleSpecifiers.getModuleSpecifiers(
+                moduleSymbol,
+                checker,
+                program.getCompilerOptions(),
+                importingSourceFile,
+                msHost,
+                userPreferences
+            );
         const specifier = specifiers?.[0];
         if (!specifier) return null;
 
@@ -79,7 +85,9 @@ const getModuleSpecifierViaTS = (
         const matchesAlias = Object.keys(configuredPaths).some((pattern) => {
             const isWildcard = pattern.endsWith("/*");
             const prefix = isWildcard ? pattern.slice(0, -2) : pattern;
-            return isWildcard ? specifier.startsWith(prefix + "/") : specifier === prefix;
+            return isWildcard
+                ? specifier.startsWith(prefix + "/")
+                : specifier === prefix;
         });
         return matchesAlias ? specifier : null;
     } catch {
@@ -119,7 +127,12 @@ export const transformImport = ({
             );
             if (!directImport) return;
 
-            return buildImportDeclaration(importDeclaration, specifier, directImport, j);
+            return buildImportDeclaration(
+                importDeclaration,
+                specifier,
+                directImport,
+                j
+            );
         })
         .filter((declaration): declaration is ImportDeclaration => {
             return declaration !== undefined;
@@ -150,14 +163,27 @@ const getDirectImport = (
     // Namespace import: resolve barrel file itself (e.g. "./api" → "./api/index")
     if (specifier.type === "ImportNamespaceSpecifier") {
         const importSource = importDeclaration.node.source.value as string;
-        const barrelPath = resolveImportPath(importSource, sourceFilePath, program, tsCompilerHost);
+        const barrelPath = resolveImportPath(
+            importSource,
+            sourceFilePath,
+            program,
+            tsCompilerHost
+        );
         const absBarrelPath = path.resolve(barrelPath);
         if (useAliases) {
             const importingSourceFile = program.getSourceFile(sourceFilePath)!;
-            const aliased = getModuleSpecifierViaTS(absBarrelPath, importingSourceFile, program, tsCompilerHost);
+            const aliased = getModuleSpecifierViaTS(
+                absBarrelPath,
+                importingSourceFile,
+                program,
+                tsCompilerHost
+            );
             if (aliased) return aliased;
         }
-        return toRelativeImportPath(path.resolve(sourceFilePath), absBarrelPath);
+        return toRelativeImportPath(
+            path.resolve(sourceFilePath),
+            absBarrelPath
+        );
     }
 
     // Named or default: find the actual declaration file via TS language service.
@@ -165,22 +191,40 @@ const getDirectImport = (
     // TypeScript considers an import specifier as the "definition" of its local binding,
     // so getDefinitionAtPosition on the source specifier stays in the source file.
     // Starting from the barrel file's export statement correctly follows the re-export chain.
-    const symbolName = specifier.type === "ImportDefaultSpecifier"
-        ? "default"
-        : (specifier as ImportSpecifier).imported.name;
+    const symbolName =
+        specifier.type === "ImportDefaultSpecifier"
+            ? "default"
+            : (specifier as ImportSpecifier).imported.name;
 
     const importSource = importDeclaration.node.source.value as string;
-    const barrelFilePath = resolveImportPath(importSource, sourceFilePath, program, tsCompilerHost);
-    const declarationFilePath = findSymbolDeclaration(barrelFilePath, symbolName, program);
+    const barrelFilePath = resolveImportPath(
+        importSource,
+        sourceFilePath,
+        program,
+        tsCompilerHost
+    );
+    const declarationFilePath = findSymbolDeclaration(
+        barrelFilePath,
+        symbolName,
+        program
+    );
 
     if (!declarationFilePath) return null;
     const absDeclarationPath = path.resolve(declarationFilePath);
     if (useAliases) {
         const importingSourceFile = program.getSourceFile(sourceFilePath)!;
-        const aliased = getModuleSpecifierViaTS(absDeclarationPath, importingSourceFile, program, tsCompilerHost);
+        const aliased = getModuleSpecifierViaTS(
+            absDeclarationPath,
+            importingSourceFile,
+            program,
+            tsCompilerHost
+        );
         if (aliased) return aliased;
     }
-    return toRelativeImportPath(path.resolve(sourceFilePath), absDeclarationPath);
+    return toRelativeImportPath(
+        path.resolve(sourceFilePath),
+        absDeclarationPath
+    );
 };
 
 const buildImportDeclaration = (
@@ -192,17 +236,23 @@ const buildImportDeclaration = (
     let specNode;
 
     if (specifier.type === "ImportNamespaceSpecifier") {
-        specNode = j.importNamespaceSpecifier(j.identifier(specifier.local!.name));
+        specNode = j.importNamespaceSpecifier(
+            j.identifier(specifier.local!.name)
+        );
     } else if (specifier.type === "ImportDefaultSpecifier") {
         // import X from "..." → { default as X }
-        specNode = j.importSpecifier(j.identifier("default"), j.identifier(specifier.local!.name));
+        specNode = j.importSpecifier(
+            j.identifier("default"),
+            j.identifier(specifier.local!.name)
+        );
     } else {
         // ImportSpecifier: { User } or { User as AppUser }
         const imp = (specifier as ImportSpecifier).imported.name;
         const loc = specifier.local!.name;
-        specNode = imp === loc
-            ? j.importSpecifier(j.identifier(imp))
-            : j.importSpecifier(j.identifier(imp), j.identifier(loc));
+        specNode =
+            imp === loc
+                ? j.importSpecifier(j.identifier(imp))
+                : j.importSpecifier(j.identifier(imp), j.identifier(loc));
     }
 
     const newDecl = j.importDeclaration([specNode], j.literal(resolvedPath));
