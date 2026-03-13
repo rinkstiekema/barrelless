@@ -109,12 +109,12 @@ __tests__/
 
 ## Roadmap
 
-[x] Resolve to relative path when it's shorter than the absolute path
-[x] Share barrel file map across files for performance
-[x] Share TypeScript program instance across files
-[ ] Preserve path aliases in resolved imports (e.g. `@shared/hooks/useData`)
-[ ] Clean up barrel files after rewriting all imports
-[ ] Publish as an npm package
+- [x] Resolve to relative path when it's shorter than the absolute path
+- [x] Share barrel file map across files for performance
+- [x] Share TypeScript program instance across files
+- [x] Preserve path aliases in resolved imports (e.g. `@shared/hooks/useData`)
+- [ ] Clean up barrel files after rewriting all imports
+- [ ] Publish as an npm package
 
 ## License
 
